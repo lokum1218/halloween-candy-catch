@@ -2,9 +2,12 @@
 const API='https://halloween-candy-catch.kcnwhydynd.chatgpt.site/api/records';
 const rows=document.getElementById('rows'),status=document.getElementById('record-status'),more=document.getElementById('more');
 const ranking=document.getElementById('ranking'),all=document.getElementById('all'),csv=document.getElementById('csv');
+let adminKey='';
+const login=document.getElementById('admin-login'),panel=document.getElementById('admin-content'),password=document.getElementById('admin-password'),loginStatus=document.getElementById('login-status');
+function lock(){adminKey='';rows.replaceChildren();panel.hidden=true;login.hidden=false;password.value='';}
 let mode='ranking',before=null,loading=false,shown=0;
 const time=value=>new Date(value).toLocaleString('ko-KR',{timeZone:'Asia/Seoul',hour12:false});
-async function get(query='') {const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),15000);try{const r=await fetch(API+query,{signal:controller.signal});const d=await r.json();if(!r.ok)throw new Error(d.error||'기록을 불러오지 못했습니다.');return d;}finally{clearTimeout(timer);}}
+async function get(query='') {const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),15000);try{const r=await fetch(API+query,{signal:controller.signal,headers:{Authorization:"Bearer "+adminKey}});const d=await r.json();if(r.status===401)lock();if(!r.ok)throw new Error(d.error||'기록을 불러오지 못했습니다.');return d;}finally{clearTimeout(timer);}}
 async function load(append=false){
  if(loading)return;loading=true;status.textContent='기록을 불러오는 중…';more.disabled=true;
  ranking.disabled=all.disabled=true;
@@ -29,5 +32,9 @@ csv.onclick=async()=>{
  const lines=[['기록 번호','밴드 닉네임','점수','받은 사탕','받은 폭탄','놓친 사탕','진행 시간(초)','기록 시각(한국)'],...records.map(r=>[r.id,r.nickname,r.score,r.caught,r.bombs,r.misses,(r.ticks/60).toFixed(2),time(r.created_at)])];
  const blob=new Blob(['\uFEFF'+lines.map(l=>l.map(escape).join(',')).join('\r\n')],{type:'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='candy-game-records.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);status.textContent=`${records.length}개의 기록을 내려받았습니다.`;
  }catch(e){status.textContent='내려받기 실패: '+e.message;}finally{csv.disabled=false;csv.textContent=old;}
-};load();
+};
+login.onsubmit=async event=>{event.preventDefault();adminKey=password.value.trim();loginStatus.textContent='확인 중…';const button=login.querySelector('button');button.disabled=true;try{await get('?view=ranking');password.value='';login.hidden=true;panel.hidden=false;loginStatus.textContent='';await load();}catch(e){lock();loginStatus.textContent=e.message;}finally{button.disabled=false;}};
+document.getElementById('logout').onclick=()=>{lock();loginStatus.textContent='기록실을 잠갔습니다.';};
+window.addEventListener('pagehide',lock);
+
 })();
