@@ -1,4 +1,4 @@
-export const WITCH_VERSION='witch-v1';
+export const WITCH_VERSION='witch-v2';
 export const TICK_RATE=30;
 export const MAX_TICKS=2700;
 function hash(seed,n){let x=(seed^Math.imul(n+1,0x9e3779b9))>>>0;x^=x>>>16;x=Math.imul(x,0x7feb352d);x^=x>>>15;x=Math.imul(x,0x846ca68b);return ((x^(x>>>16))>>>0)%3;}
@@ -16,7 +16,7 @@ export function createWitchGame(seed){
   if(state.hideTicks>75){state.hidden=false;state.hideTicks=0;state.hideCooldown=45;}
   const phase=state.tick%90,cycle=Math.floor(state.tick/90),witchLane=hash(state.seed,cycle);
   if(requestThrow){if(state.hidden||state.throwCooldown)throw Error('과자 던지기 간격이 맞지 않습니다.');state.throwCooldown=16;state.lastThrow=state.tick;state.throws++;}
-  if(phase>=30&&phase<70&&witchLane===state.lane&&!state.hidden){state.ended=true;state.reason='들킴';}
+  if(phase>=60&&phase<82&&witchLane===state.lane&&!state.hidden){state.ended=true;state.reason='들킴';}
   if(!state.ended&&state.tick-state.lastThrow>270){state.ended=true;state.reason='과자를 던지지 않음';}
   state.tick++;
   if(state.tick>=MAX_TICKS&&!state.ended){state.ended=true;state.reason='끝까지 버팀';}
