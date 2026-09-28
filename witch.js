@@ -1,4 +1,4 @@
-import {createWitchGame,TICK_RATE,MAX_TICKS} from './witch-engine.js';
+import {createWitchGame,TICK_RATE,MAX_TICKS} from './witch-engine.js?v=2';
 const API='https://halloween-candy-catch.kcnwhydynd.chatgpt.site/api/witch';
 const $=id=>document.getElementById(id),canvas=$('scene'),ctx=canvas.getContext('2d');
 let game=null,session=null,trace=[],desiredLane=1,desiredHide=false,queuedThrow=false,acc=0,last=0,active=false,pointer=null,pending=null;
