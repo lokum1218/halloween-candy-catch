@@ -1,13 +1,13 @@
 import {createWitchGame,TICK_RATE,MAX_TICKS} from './witch-engine.js?v=4';
 const API='https://halloween-candy-catch.kcnwhydynd.chatgpt.site/api/witch';
 const $=id=>document.getElementById(id),canvas=$('scene'),ctx=canvas.getContext('2d');
-const witchSprite=new Image(),playerSprite=new Image();witchSprite.src='./witch-pixel-v2.png';playerSprite.src='./player-pixel-v2.png';
+const witchSprite=new Image(),playerSprite=new Image(),candySprite=new Image();witchSprite.src='./witch-pixel-v2.png';playerSprite.src='./player-pixel-v2.png';candySprite.src='./candy-pixel-v2.png';
 let game=null,session=null,trace=[],desiredLane=1,desiredHide=false,queuedThrow=false,acc=0,last=0,active=false,pointer=null,pending=null;
 const seconds=t=>(t/TICK_RATE).toFixed(1)+'초';
 function rounded(x,y,w,h,r,fill){ctx.fillStyle=fill;ctx.beginPath();ctx.roundRect(x,y,w,h,r);ctx.fill();}
 function sprite(img,cx,bottom,maxW,maxH){if(!img.complete||!img.naturalWidth)return;const ratio=Math.min(maxW/img.naturalWidth,maxH/img.naturalHeight);const w=img.naturalWidth*ratio,h=img.naturalHeight*ratio;ctx.imageSmoothingEnabled=false;ctx.drawImage(img,cx-w/2,bottom-h,w,h);}
 function resizeScene(){const mobile=window.matchMedia('(max-width:700px)').matches;const w=mobile?480:960,h=mobile?740:590;if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h;}return {w,h,mobile};}
-function cookie(x,y,r){ctx.fillStyle='#f4b281';ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.fill();ctx.fillStyle='#9c4561';for(const [dx,dy] of [[-.36,-.22],[.24,-.3],[.08,.35],[-.45,.32]])ctx.fillRect(x+dx*r,y+dy*r,Math.max(3,r*.18),Math.max(3,r*.18));}
+function cookie(x,y,r){sprite(candySprite,x,y+r,r*5,r*5);}
 function draw(){
  const {w,h,mobile}=resizeScene(),s=game,phase=s?s.phase:0,look=s&&phase>=30&&phase<320,lane=s?s.witchLane:1;
  ctx.imageSmoothingEnabled=false;
