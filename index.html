@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#100b1c">
+  <meta name="description" content="하늘에서 떨어지는 핼러윈 사탕을 호박 바구니에 받아 보세요.">
+  <title>사탕 사냥 — 핼러윈 게임</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23170c29'/%3E%3Ctext x='32' y='47' text-anchor='middle' font-size='42'%3E%F0%9F%8E%83%3C/text%3E%3C/svg%3E">
+  <link rel="stylesheet" href="./style.css">
+  <script src="./game.js" defer></script>
+</head>
+<body>
+  <main class="shell">
+    <header class="masthead">
+      <div class="brand"><span class="brand-icon" aria-hidden="true">✦</span> HALLOWEEN ARCADE <span class="brand-icon" aria-hidden="true">✦</span></div>
+      <div class="masthead-side">10.31 <span aria-hidden="true">✳</span> CANDY RUN</div>
+    </header>
+
+    <section class="machine" aria-label="사탕 사냥 게임">
+      <div class="machine-top"><span class="bulb"></span><span class="bulb"></span><span class="bulb"></span><span class="bulb"></span><span class="bulb"></span><span class="bulb"></span><span class="bulb"></span><span class="bulb"></span><span class="bulb"></span><span class="bulb"></span><span class="bulb"></span><span class="bulb"></span></div>
+      <div class="title-row">
+        <div><div class="eyebrow">TRICK OR TREAT · 60 SECOND CHALLENGE</div><h1>사탕 <em>사냥</em><span class="title-spark" aria-hidden="true">✳</span></h1></div>
+        <div class="title-stamp" aria-hidden="true">🍬<br><span>CATCH!</span></div>
+      </div>
+
+      <div class="hud" aria-live="polite">
+        <div class="hud-item"><span class="hud-label">플레이어</span><strong id="player-name">—</strong></div>
+        <div class="hud-item"><span class="hud-label">점수</span><strong id="score">000</strong></div>
+        <div class="hud-item"><span class="hud-label">남은 시간</span><strong id="time">60<span class="unit">초</span></strong></div>
+        <div class="hud-item"><span class="hud-label">놓친 사탕</span><strong id="misses">0<span class="unit"> / 5</span></strong></div>
+      </div>
+
+      <div class="screen-wrap">
+        <canvas id="game" width="900" height="520" aria-label="사탕과 폭탄이 떨어지는 게임 화면"></canvas>
+        <div class="screen-vignette" aria-hidden="true"></div>
+        <div id="start-panel" class="overlay">
+          <div class="card">
+            <span class="card-icon" aria-hidden="true">🎃</span>
+            <div class="card-kicker">READY TO PLAY?</div>
+            <h2>사탕은 받고,<br>폭탄은 피하세요.</h2>
+            <p>60초 동안 호박 바구니를 움직여 사탕을 받으세요.<br>사탕을 5개 놓치면 게임이 끝나요.</p>
+            <form id="start-form">
+              <label for="nickname">밴드 닉네임</label>
+              <div class="form-row"><input id="nickname" name="nickname" type="text" maxlength="16" autocomplete="nickname" placeholder="닉네임을 입력하세요" required><button type="submit">게임 시작 <span aria-hidden="true">↗</span></button></div>
+            </form>
+          </div>
+        </div>
+        <div id="end-panel" class="overlay hidden" role="dialog" aria-modal="true" aria-labelledby="end-title">
+          <div class="card end-card">
+            <span class="card-icon" aria-hidden="true">🍬</span>
+            <div class="card-kicker">GAME OVER</div>
+            <h2 id="end-title">사탕 수확 완료!</h2>
+            <p id="end-summary"></p>
+            <div class="final-score"><span>최종 점수</span><strong id="final-score">0</strong></div>
+            <button type="button" id="again-button" class="again-button">다시 도전하기 <span aria-hidden="true">↗</span></button>
+          </div>
+        </div>
+      </div>
+
+      <div class="machine-bottom">
+        <div class="instructions"><span class="keycap">←</span><span class="keycap">→</span> 또는 <span class="keycap">A</span><span class="keycap">D</span>로 이동 <span class="divider">/</span> 모바일에서는 화면을 밀어 이동</div>
+        <div class="legend"><span>🍬 +10</span><span>💣 −15</span></div>
+      </div>
+      <div class="touch-controls" aria-label="모바일 이동 버튼"><button type="button" id="left-button" aria-label="왼쪽으로 이동">←</button><span>바구니 이동</span><button type="button" id="right-button" aria-label="오른쪽으로 이동">→</button></div>
+    </section>
+    <footer><span>밤이 깊을수록 사탕은 더 빨리 떨어집니다.</span><span>✦ HAPPY HALLOWEEN ✦</span></footer>
+  </main>
+</body>
+</html>
