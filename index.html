@@ -8,7 +8,7 @@
   <title>사탕 사냥 — 핼러윈 게임</title>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23170c29'/%3E%3Ctext x='32' y='47' text-anchor='middle' font-size='42'%3E%F0%9F%8E%83%3C/text%3E%3C/svg%3E">
   <link rel="stylesheet" href="./style.css">
-  <script src="./game.js" defer></script>
+  <script type="module" src="./game.js"></script>
 </head>
 <body>
   <main class="shell">
@@ -40,7 +40,7 @@
             <div class="card-kicker">READY TO PLAY?</div>
             <h2>사탕은 받고,<br>폭탄은 피하세요.</h2>
             <p>60초 동안 호박 바구니를 움직여 사탕을 받으세요.<br>사탕을 5개 놓치면 게임이 끝나요.</p>
-            <form id="start-form">
+            <p class="record-notice">닉네임·점수·기록 시각이 참가 기록에 공개됩니다.<br>밴드에서 사용하는 닉네임을 정확히 입력해 주세요.</p><p id="start-status" role="status"></p><form id="start-form">
               <label for="nickname">밴드 닉네임</label>
               <div class="form-row"><input id="nickname" name="nickname" type="text" maxlength="16" autocomplete="nickname" placeholder="닉네임을 입력하세요" required><button type="submit">게임 시작 <span aria-hidden="true">↗</span></button></div>
             </form>
@@ -53,7 +53,7 @@
             <h2 id="end-title">사탕 수확 완료!</h2>
             <p id="end-summary"></p>
             <div class="final-score"><span>최종 점수</span><strong id="final-score">0</strong></div>
-            <button type="button" id="again-button" class="again-button">다시 도전하기 <span aria-hidden="true">↗</span></button>
+            <p id="save-status" role="status"></p><button type="button" id="retry-save" class="again-button" hidden>기록 다시 저장</button><a class="records-link" href="./records.html">순위와 참가 기록 보기</a><button type="button" id="again-button" class="again-button">다시 도전하기 <span aria-hidden="true">↗</span></button>
           </div>
         </div>
       </div>
@@ -64,7 +64,7 @@
       </div>
       <div class="touch-controls" aria-label="모바일 이동 버튼"><button type="button" id="left-button" aria-label="왼쪽으로 이동">←</button><span>바구니 이동</span><button type="button" id="right-button" aria-label="오른쪽으로 이동">→</button></div>
     </section>
-    <footer><span>밤이 깊을수록 사탕은 더 빨리 떨어집니다.</span><span>✦ HAPPY HALLOWEEN ✦</span></footer>
+    <nav class="records-nav"><a href="./records.html">🏆 순위 · 참가 기록</a></nav><footer><span>밤이 깊을수록 사탕은 더 빨리 떨어집니다.</span><span>✦ HAPPY HALLOWEEN ✦</span></footer>
   </main>
 </body>
 </html>

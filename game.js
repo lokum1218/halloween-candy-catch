@@ -1,3 +1,4 @@
+import {createGame,STEP,ENGINE_VERSION} from './engine.js';
 (() => {
   const canvas = document.getElementById('game');
   const ctx = canvas.getContext('2d');
@@ -20,6 +21,12 @@
   }));
   const candyIcons = ['🍬', '🍭', '🍬', '🍫'];
   let W = 900, H = 520, last = 0;
+  const API = 'https://halloween-candy-catch.kcnwhydynd.chatgpt.site/api';
+  let engine = null, session = null, trace = [], accumulator = 0, pending = null;
+  const saveStatus = document.getElementById('save-status');
+  const retryButton = document.getElementById('retry-save');
+  const startStatus = document.getElementById('start-status');
+  const startButton = form.querySelector('button');
   let state = 'ready';
   let player = '';
   let score = 0, misses = 0, remaining = 60, elapsed = 0, spawnClock = 0;
@@ -27,16 +34,18 @@
   let drops = [], particles = [], floaters = [];
 
   function resize() {
-    const rect = canvas.getBoundingClientRect();
-    const oldW = W;
-    W = rect.width || 900;
-    H = rect.height || 520;
-    const ratio = Math.min(window.devicePixelRatio || 1, 2);
-    canvas.width = Math.round(W * ratio);
-    canvas.height = Math.round(H * ratio);
-    ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
-    basketX = oldW ? basketX / oldW * W : W / 2;
-    drops.forEach(drop => { drop.x = drop.x / oldW * W; });
+    const rect=canvas.getBoundingClientRect();
+    if(state!=='playing') {W=Math.round(rect.width)||900;H=Math.round(rect.height)||520;basketX=W/2;}
+    const ratio=Math.min(window.devicePixelRatio||1,2);
+    canvas.width=Math.round(rect.width*ratio);canvas.height=Math.round(rect.height*ratio);
+    ctx.setTransform(ratio*rect.width/W,0,0,ratio*rect.height/H,0,0);
+  }
+  async function api(path,payload) {
+    const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),15000);
+    try {
+      const response=await fetch(API+path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload),signal:controller.signal});
+      const data=await response.json();if(!response.ok)throw new Error(data.error||'기록 서버에 연결할 수 없습니다.');return data;
+    } finally {clearTimeout(timer);}
   }
   function basketWidth() { return Math.max(64, Math.min(88, W * .13)); }
   function clampX(x) { return Math.max(basketWidth() / 2 + 5, Math.min(W - basketWidth() / 2 - 5, x)); }
@@ -45,36 +54,46 @@
     timeEl.innerHTML = `${Math.ceil(remaining)}<span class="unit">초</span>`;
     missesEl.innerHTML = `${misses}<span class="unit"> / 5</span>`;
   }
-  function startGame(nickname) {
-    const clean = String(nickname).trim().slice(0, 16);
-    if (!clean) throw new Error('밴드 닉네임을 입력해 주세요.');
-    player = clean;
-    playerEl.textContent = player;
-    score = 0; misses = 0; remaining = 60; elapsed = 0; spawnClock = .4;
-    basketX = W / 2; targetX = null; drops = []; particles = []; floaters = [];
-    state = 'playing';
-    startPanel.classList.add('hidden');
-    endPanel.classList.add('hidden');
-    updateHud();
-    canvas.focus?.();
-    return { player, status: 'playing', remainingSeconds: 60 };
+  async function startGame(nickname) {
+    if(state==='loading'||state==='saving'||pending)return;
+    const clean=String(nickname).trim().slice(0,16);
+    if(!clean)throw new Error('밴드 닉네임을 입력해 주세요.');
+    state='loading';startButton.disabled=true;againButton.disabled=true;
+    startStatus.textContent='기록 서버에 연결 중…';
+    try {
+      resize();
+      session=await api('/sessions',{nickname:clean,width:W,height:H});
+      if(session.version!==ENGINE_VERSION)throw new Error('게임이 업데이트됐습니다. 새로고침해 주세요.');
+      W=session.width;H=session.height;engine=createGame(session.seed,W,H);trace=[];accumulator=0;
+      player=session.nickname;playerEl.textContent=player;
+      score=0;misses=0;remaining=60;elapsed=0;basketX=W/2;targetX=null;drops=[];particles=[];floaters=[];
+      state='playing';resize();startPanel.classList.add('hidden');endPanel.classList.add('hidden');
+      startStatus.textContent='';keys.left=keys.right=false;updateHud();
+    } catch(error) {
+      state='ready';endPanel.classList.add('hidden');startPanel.classList.remove('hidden');
+      startStatus.textContent=error.message==='Failed to fetch'?'기록 서버에 연결하지 못했습니다. 다시 시도해 주세요.':error.message;
+    } finally {startButton.disabled=false;againButton.disabled=false;}
+  }
+  async function saveRecord() {
+    if(!pending)return;
+    state='saving';saveStatus.textContent='점수 확인 및 기록 저장 중…';retryButton.hidden=true;againButton.disabled=true;
+    try {
+      const data=await api('/records',{sessionId:pending.sessionId,trace:pending.trace});
+      finalScoreEl.textContent=data.record.score;
+      saveStatus.textContent=`저장 완료 · 기록 번호 #${data.record.id}`;
+      pending=null;try{sessionStorage.removeItem('candy-pending-record');}catch{}
+      state='ended';againButton.disabled=false;
+    } catch(error) {
+      state='ended';saveStatus.textContent='아직 저장되지 않았어요. '+(error.message==='Failed to fetch'?'연결을 확인하고 다시 저장해 주세요.':error.message);
+      retryButton.hidden=false;
+    }
   }
   function finish() {
-    state = 'ended';
-    endPanel.classList.remove('hidden');
-    finalScoreEl.textContent = score;
-    summaryEl.textContent = misses >= 5
-      ? `${player}님, 사탕을 5개 놓쳤어요. 다음엔 더 빠르게!`
-      : `${player}님, 60초를 버텼어요. 꽤 매서운 밤이었죠?`;
-    againButton.focus();
-  }
-  function spawn() {
-    const bomb = Math.random() < Math.min(.29, .18 + elapsed / 500);
-    const size = Math.max(25, Math.min(34, W * .052));
-    drops.push({ x: 27 + Math.random() * (W - 54), y: -35, size,
-      speed: (H / 2.1) + Math.random() * (H / 3.8) + elapsed * 2.2,
-      drift: (Math.random() - .5) * 45, phase: Math.random() * 6.28,
-      bomb, icon: bomb ? '💣' : candyIcons[Math.floor(Math.random() * candyIcons.length)] });
+    state='ended';endPanel.classList.remove('hidden');finalScoreEl.textContent=score;
+    summaryEl.textContent=misses>=5?`${player}님, 사탕을 5개 놓쳤어요. 다음엔 더 빠르게!`:`${player}님, 60초를 버텼어요. 꽤 매서운 밤이었죠?`;
+    pending={sessionId:session.sessionId,trace,nickname:player,score};
+    try{sessionStorage.setItem('candy-pending-record',JSON.stringify(pending));}catch{}
+    saveRecord();
   }
   function burst(x, y, color, label) {
     floaters.push({ x, y, text: label, life: .85, color });
@@ -82,46 +101,23 @@
       vy: -Math.random() * 120, life: .55 + Math.random() * .35, color });
   }
   function tick(dt) {
-    if (state !== 'playing') return;
-    elapsed += dt;
-    remaining = Math.max(0, 60 - elapsed);
-    const moveSpeed = Math.max(280, Math.min(490, W * .58));
-    if (keys.left) basketX -= moveSpeed * dt;
-    if (keys.right) basketX += moveSpeed * dt;
-    if (!keys.left && !keys.right && targetX !== null) {
-      const delta = targetX - basketX;
-      basketX += Math.sign(delta) * Math.min(Math.abs(delta), moveSpeed * 1.5 * dt);
+    if(state!=='playing')return;
+    accumulator+=dt;
+    while(accumulator>=STEP&&state==='playing') {
+      accumulator-=STEP;
+      const speed=Math.max(280,Math.min(490,W*.58));
+      let target=targetX===null?engine.x:targetX;
+      if(keys.left||keys.right)target=engine.x+((keys.right?1:0)-(keys.left?1:0))*speed*STEP;
+      target=Math.round(Math.max(0,Math.min(W,target)));
+      trace.push(target);
+      const events=engine.step(target);
+      score=engine.score;misses=engine.misses;elapsed=engine.tick*STEP;remaining=Math.max(0,60-elapsed);basketX=engine.x;drops=engine.drops;
+      events.forEach(e=>burst(e.x,e.y,e.type==='catch'?'#ffd477':'#fb7c9b',e.type==='catch'?'+10':e.type==='bomb'?'−15':'MISS'));
+      if(engine.ended)finish();
     }
-    basketX = clampX(basketX);
-    spawnClock -= dt;
-    if (spawnClock <= 0) {
-      spawn();
-      spawnClock = Math.max(.38, .85 - elapsed * .006) * (.78 + Math.random() * .5);
-    }
-    const basketY = H - Math.max(47, Math.min(63, H * .12));
-    for (let i = drops.length - 1; i >= 0; i--) {
-      const d = drops[i];
-      d.phase += dt * 2.7;
-      d.x += (d.drift + Math.sin(d.phase) * 22) * dt;
-      d.x = Math.max(18, Math.min(W - 18, d.x));
-      d.y += d.speed * dt;
-      const reach = basketWidth() * .40 + d.size * .24;
-      if (d.y + d.size * .22 >= basketY - 9 && d.y < basketY + 20 && Math.abs(d.x - basketX) < reach) {
-        if (d.bomb) { score = Math.max(0, score - 15); burst(d.x, basketY, '#fb7c9b', '−15'); }
-        else { score += 10; burst(d.x, basketY, '#ffd477', '+10'); }
-        drops.splice(i, 1);
-        updateHud();
-      } else if (d.y > H + d.size) {
-        if (!d.bomb) { misses++; burst(d.x, H - 25, '#f39aa3', 'MISS'); updateHud(); }
-        drops.splice(i, 1);
-      }
-    }
-    particles = particles.filter(p => (p.life -= dt) > 0);
-    particles.forEach(p => { p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 190 * dt; });
-    floaters = floaters.filter(f => (f.life -= dt) > 0);
-    floaters.forEach(f => { f.y -= 28 * dt; });
-    if (misses >= 5 || remaining <= 0) finish();
-    else updateHud();
+    particles=particles.filter(p=>(p.life-=dt)>0);particles.forEach(p=>{p.x+=p.vx*dt;p.y+=p.vy*dt;p.vy+=190*dt;});
+    floaters=floaters.filter(f=>(f.life-=dt)>0);floaters.forEach(f=>f.y-=28*dt);
+    updateHud();
   }
   function roundRect(x, y, w, h, r, fill) {
     ctx.beginPath(); ctx.roundRect(x, y, w, h, r); ctx.fillStyle = fill; ctx.fill();
@@ -167,9 +163,10 @@
     const dt = Math.min((now - (last || now)) / 1000, .05); last = now;
     tick(dt); draw(); requestAnimationFrame(frame);
   }
-  form.addEventListener('submit', event => { event.preventDefault(); try { startGame(nameInput.value); } catch (error) { nameInput.setCustomValidity(error.message); nameInput.reportValidity(); } });
+  form.addEventListener('submit', async event => { event.preventDefault(); try { await startGame(nameInput.value); } catch (error) { nameInput.setCustomValidity(error.message); nameInput.reportValidity(); } });
   nameInput.addEventListener('input', () => nameInput.setCustomValidity(''));
   againButton.addEventListener('click', () => startGame(player));
+  retryButton.addEventListener('click',saveRecord);
   window.addEventListener('keydown', event => {
     if (event.key === 'ArrowLeft' || event.key.toLowerCase() === 'a') { keys.left = true; targetX = null; if (state === 'playing') event.preventDefault(); }
     if (event.key === 'ArrowRight' || event.key.toLowerCase() === 'd') { keys.right = true; targetX = null; if (state === 'playing') event.preventDefault(); }
@@ -179,8 +176,8 @@
     if (event.key === 'ArrowRight' || event.key.toLowerCase() === 'd') keys.right = false;
   });
   window.addEventListener('blur', () => { keys.left = keys.right = false; });
-  canvas.addEventListener('pointerdown', event => { if (state === 'playing') { canvas.setPointerCapture(event.pointerId); targetX = clampX(event.clientX - canvas.getBoundingClientRect().left); } });
-  canvas.addEventListener('pointermove', event => { if (state === 'playing' && (event.buttons || event.pointerType === 'mouse')) targetX = clampX(event.clientX - canvas.getBoundingClientRect().left); });
+  canvas.addEventListener('pointerdown', event => { if (state === 'playing') { canvas.setPointerCapture(event.pointerId); targetX = clampX((event.clientX - canvas.getBoundingClientRect().left) * W / canvas.getBoundingClientRect().width); } });
+  canvas.addEventListener('pointermove', event => { if (state === 'playing' && (event.buttons || event.pointerType === 'mouse')) targetX = clampX((event.clientX - canvas.getBoundingClientRect().left) * W / canvas.getBoundingClientRect().width); });
   ['left', 'right'].forEach(direction => {
     const button = document.getElementById(`${direction}-button`);
     button.addEventListener('pointerdown', event => { event.preventDefault(); button.setPointerCapture(event.pointerId); keys[direction] = true; targetX = null; });
@@ -199,4 +196,12 @@
   }
   new ResizeObserver(resize).observe(canvas);
   resize(); updateHud(); requestAnimationFrame(frame);
+  try {
+    const saved=JSON.parse(sessionStorage.getItem('candy-pending-record')||'null');
+    if(saved&&typeof saved.sessionId==='string'&&Array.isArray(saved.trace)) {
+      pending=saved;player=saved.nickname;startPanel.classList.add('hidden');endPanel.classList.remove('hidden');
+      finalScoreEl.textContent=saved.score;summaryEl.textContent='이전에 저장하지 못한 기록을 다시 전송합니다.';saveRecord();
+    }
+  }catch{}
+
 })();
