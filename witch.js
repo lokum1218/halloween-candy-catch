@@ -1,0 +1,35 @@
+import {createWitchGame,TICK_RATE,MAX_TICKS} from './witch-engine.js';
+const API='https://halloween-candy-catch.kcnwhydynd.chatgpt.site/api/witch';
+const $=id=>document.getElementById(id),canvas=$('scene'),ctx=canvas.getContext('2d');
+let game=null,session=null,trace=[],desiredLane=1,desiredHide=false,queuedThrow=false,acc=0,last=0,active=false,pointer=null,pending=null;
+const seconds=t=>(t/TICK_RATE).toFixed(1)+'초';
+function rounded(x,y,w,h,r,fill){ctx.fillStyle=fill;ctx.beginPath();ctx.roundRect(x,y,w,h,r);ctx.fill();}
+function draw(){
+ const w=960,h=590,s=game,phase=s?s.phase:0,look=s&&phase>=30&&phase<70,lane=s?s.witchLane:1;
+ const bg=ctx.createLinearGradient(0,0,0,h);bg.addColorStop(0,'#412653');bg.addColorStop(.55,'#695066');bg.addColorStop(1,'#2b213d');ctx.fillStyle=bg;ctx.fillRect(0,0,w,h);
+ ctx.fillStyle='#f7dbab';ctx.beginPath();ctx.arc(780,95,44,0,Math.PI*2);ctx.fill();ctx.fillStyle='#3a284c';ctx.beginPath();ctx.arc(798,78,42,0,Math.PI*2);ctx.fill();
+ for(let i=0;i<14;i++){ctx.fillStyle=i%2?'#f0ca9e':'#cda8ce';ctx.beginPath();ctx.arc((i*173+55)%960,(i*73+41)%310,2,0,7);ctx.fill();}
+ ctx.fillStyle='#1e1832';ctx.beginPath();ctx.moveTo(0,350);for(let x=0;x<=960;x+=32)ctx.lineTo(x,342+Math.sin(x*.017)*24);ctx.lineTo(960,590);ctx.lineTo(0,590);ctx.fill();
+ ctx.textAlign='center';ctx.font='bold 16px sans-serif';ctx.fillStyle='#f6d0bb';ctx.fillText('마녀의 시선',480,40);
+ if(s&&!s.ended){ctx.fillStyle=look?'#ff817d':'#ffc880';ctx.fillText(look?'지금 뒤돌아봅니다!':'곧 '+['왼쪽','가운데','오른쪽'][lane]+'을 봅니다',480,66);}
+ ctx.save();ctx.translate(480,235);ctx.fillStyle='#1b1029';ctx.beginPath();ctx.moveTo(-67,80);ctx.quadraticCurveTo(-95,-5,-32,-20);ctx.lineTo(38,-20);ctx.quadraticCurveTo(100,10,72,80);ctx.closePath();ctx.fill();ctx.fillStyle='#271532';ctx.beginPath();ctx.arc(0,-45,42,0,Math.PI*2);ctx.fill();ctx.fillStyle='#1b1029';ctx.beginPath();ctx.moveTo(-115,-72);ctx.lineTo(102,-72);ctx.lineTo(17,-122);ctx.lineTo(-27,-122);ctx.closePath();ctx.fill();rounded(-111,-77,222,15,7,'#1b1029');ctx.fillStyle='#e8bfc0';ctx.font='42px sans-serif';ctx.fillText(look?'👀':'',0,-37);ctx.restore();
+ const xs=[190,480,770];for(let i=0;i<3;i++){
+  if(s&&!s.ended&&i===lane){rounded(xs[i]-126,331,252,227,25,look?'#e9707260':'#f4b75b44');}
+  if(s&&i===s.lane){ctx.font='49px sans-serif';ctx.fillText(s.hidden?'🫣':'🧑',xs[i],430);}
+  rounded(xs[i]-119,418,238,137,18,'#20182f');rounded(xs[i]-109,429,218,116,15,i===1?'#855a76':'#725272');rounded(xs[i]-94,447,188,74,10,'#ac7a91');
+  ctx.fillStyle='#fff0d9';ctx.font='bold 19px sans-serif';ctx.fillText(['왼쪽','가운데','오른쪽'][i],xs[i],494);
+ }
+ ctx.fillStyle='#e7b6bd';ctx.font='bold 16px sans-serif';ctx.fillText('엄폐물 뒤를 톡 클릭하면 숨습니다 · 아래로 당기면 과자를 던집니다',480,577);
+}
+async function api(path,data){const r=await fetch(API+path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});const d=await r.json();if(!r.ok)throw Error(d.error||'기록 서버에 연결할 수 없습니다.');return d;}
+function hud(){if(!game)return;$('time').textContent=seconds(game.tick);$('throws').textContent=game.throws+'개';$('gaze').textContent=game.phase>=30&&game.phase<70?'뒤돌아봄!':'뒤돌아 있음';}
+async function save(){if(!pending)return;$('save-status').textContent='기록 저장 중…';$('retry').hidden=true;try{const d=await api('/records',pending);pending=null;$('save-status').textContent='저장 완료 · 기록 번호 '+d.record.id;$('again').disabled=false;}catch(e){$('save-status').textContent='저장 실패: '+e.message;$('retry').hidden=false;}}
+function finish(){active=false;$('end-title').textContent=game.reason==='끝까지 버팀'?'마녀를 끝까지 따돌렸어요!':game.reason==='과자를 던지지 않음'?'과자를 던져야 해요!':'마녀에게 들켰어요!';$('end-detail').textContent='던진 과자 '+game.throws+'개 · '+(game.reason==='끝까지 버팀'?'90초 생존 성공':'다음에는 마녀의 시선을 보고 숨으세요.');$('final-time').textContent=seconds(game.tick);$('end').classList.remove('hidden');$('again').disabled=true;
+ pending={sessionId:session.sessionId,trace:[...trace]};save();}
+function frame(now){if(active){if(!last)last=now;acc+=Math.min(100,now-last);last=now;while(acc>=1000/TICK_RATE&&active){const command=desiredLane|(desiredHide?4:0)|(queuedThrow?8:0);queuedThrow=false;try{game.step(command);trace.push(command);}catch(e){desiredLane=game.lane;desiredHide=false;queuedThrow=false;game.step(game.lane);trace.push(game.lane);}desiredHide=game.hidden;acc-=1000/TICK_RATE;if(game.ended)finish();}hud();}draw();requestAnimationFrame(frame);}requestAnimationFrame(frame);
+$('start-form').onsubmit=async e=>{e.preventDefault();const b=e.currentTarget.querySelector('button');b.disabled=true;$('start-status').textContent='게임 준비 중…';try{session=await api('/sessions',{nickname:$('nickname').value});game=createWitchGame(session.seed);$('name').textContent=session.nickname;trace=[];desiredLane=1;desiredHide=false;queuedThrow=false;acc=0;last=0;active=true;$('start').classList.add('hidden');$('start-status').textContent='';}catch(err){$('start-status').textContent=err.message;}finally{b.disabled=false;}};
+$('retry').onclick=save;$('again').onclick=()=>{$('end').classList.add('hidden');$('start').classList.remove('hidden');$('save-status').textContent='';};
+canvas.addEventListener('pointerdown',e=>{if(!active)return;pointer={x:e.clientX,y:e.clientY,id:e.pointerId};canvas.setPointerCapture(e.pointerId);});
+canvas.addEventListener('pointerup',e=>{if(!active||!pointer||pointer.id!==e.pointerId)return;const dx=e.clientX-pointer.x,dy=e.clientY-pointer.y;pointer=null;if(Math.abs(dx)>35&&Math.abs(dx)>Math.abs(dy)){desiredLane=Math.max(0,Math.min(2,game.lane+(dx>0?1:-1)));desiredHide=false;}else if(dy>35){desiredHide=false;queuedThrow=true;}else if(Math.abs(dx)<30&&Math.abs(dy)<30){desiredHide=!game.hidden;} });
+canvas.addEventListener('pointercancel',()=>pointer=null);
+document.addEventListener('visibilitychange',()=>{if(document.hidden&&active){last=0;acc=0;}});
