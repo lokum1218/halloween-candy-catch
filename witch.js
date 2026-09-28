@@ -1,4 +1,4 @@
-import {createWitchGame,TICK_RATE,MAX_TICKS} from './witch-engine.js?v=5';
+import {createWitchGame,TICK_RATE,MAX_TICKS} from './witch-engine.js?v=6';
 const API='https://halloween-candy-catch.kcnwhydynd.chatgpt.site/api/witch';
 const $=id=>document.getElementById(id),canvas=$('scene'),ctx=canvas.getContext('2d');
 const witchSprite=new Image(),playerSprite=new Image(),biscuitSprite=new Image(),houseSprite=new Image();witchSprite.src='./witch-pixel-v3.png';playerSprite.src='./player-pixel-v3.png';biscuitSprite.src='./biscuit-pixel-v3.png';houseSprite.src='./candy-house-v3.png';
@@ -26,7 +26,7 @@ function draw(){
  house(w,h);
  ctx.fillStyle='#35122b88';ctx.fillRect(0,0,w,h);
  ctx.textAlign='center';ctx.fillStyle='#fff0da';ctx.font=mobile?'bold 20px monospace':'bold 22px monospace';ctx.fillText(look?'마녀가 돌아봤다!':'과자 집에 살금살금',w/2,mobile?44:39);
- if(s&&!s.ended){ctx.fillStyle='#ffd08d';ctx.font='bold 16px monospace';ctx.fillText(look?(phase<270?'8초 안에 숨으세요':'지금 숨으세요!'):'마녀를 눌러 과자를 던져요',w/2,mobile?68:64);}
+ if(s&&!s.ended){ctx.fillStyle='#ffd08d';ctx.font='bold 16px monospace';ctx.fillText(look?(phase<150?'4초 안에 숨으세요':'마녀와 마주보지 마세요!'):'마녀를 눌러 과자를 던져요',w/2,mobile?68:64);}
  const hit=shots.find(shot=>performance.now()-shot.at>=380&&performance.now()-shot.at<720&&shot.lane===witchLane);
  ctx.save();if(!look)ctx.filter='brightness(.76)';if(hit)ctx.filter='brightness(1.7) saturate(1.5)';sprite(witchSprite,g.xs[witchLane]+(hit?Math.round(Math.sin(performance.now()/28)*7):0),g.witchBottom,g.witchW,g.witchH);ctx.restore();
  for(let i=0;i<3;i++){
@@ -45,6 +45,6 @@ function frame(now){if(active){if(!last)last=now;acc+=Math.min(100,now-last);las
 $('start-form').onsubmit=async e=>{e.preventDefault();const b=e.currentTarget.querySelector('button');b.disabled=true;$('start-status').textContent='게임 준비 중…';try{session=await api('/sessions',{nickname:$('nickname').value});game=createWitchGame(session.seed);trace=[];shots=[];desiredLane=1;desiredHide=false;queuedThrow=false;acc=0;last=0;active=true;$('start').classList.add('hidden');if(window.matchMedia('(max-width:700px)').matches)$('scene').scrollIntoView({block:'center'});$('start-status').textContent='';}catch(err){$('start-status').textContent=err.message;}finally{b.disabled=false;}};
 $('retry').onclick=save;$('again').onclick=()=>{$('end').classList.add('hidden');$('start').classList.remove('hidden');$('save-status').textContent='';};
 canvas.addEventListener('pointerdown',e=>{if(!active)return;pointer={x:e.clientX,y:e.clientY,id:e.pointerId};canvas.setPointerCapture(e.pointerId);});
-canvas.addEventListener('pointerup',e=>{if(!active||!pointer||pointer.id!==e.pointerId)return;const dx=e.clientX-pointer.x,dy=e.clientY-pointer.y;pointer=null;if(Math.abs(dx)>35&&Math.abs(dx)>Math.abs(dy)){desiredLane=Math.max(0,Math.min(2,game.lane+(dx>0?1:-1)));desiredHide=false;return;}if(Math.hypot(dx,dy)>30)return;const rect=canvas.getBoundingClientRect(),x=(e.clientX-rect.left)*canvas.width/rect.width,y=(e.clientY-rect.top)*canvas.height/rect.height,g=geometry(canvas.width===480);const cover=g.xs.findIndex(cx=>Math.abs(x-cx)<=g.coverW/2+5&&y>=g.coverY-8&&y<=g.coverY+g.coverH+8);if(cover>=0){desiredLane=cover;desiredHide=true;queuedThrow=false;return;}const wx=g.xs[game.witchLane??1];if(Math.abs(x-wx)<=g.witchW/2+10&&y>=g.witchBottom-g.witchH-10&&y<=g.witchBottom+10){desiredHide=false;queuedThrow=true;}});
+canvas.addEventListener('pointerup',e=>{if(!active||!pointer||pointer.id!==e.pointerId)return;const dx=e.clientX-pointer.x,dy=e.clientY-pointer.y;pointer=null;if(Math.hypot(dx,dy)>30)return;const rect=canvas.getBoundingClientRect(),x=(e.clientX-rect.left)*canvas.width/rect.width,y=(e.clientY-rect.top)*canvas.height/rect.height,g=geometry(canvas.width===480);const cover=g.xs.findIndex(cx=>Math.abs(x-cx)<=g.coverW/2+5&&y>=g.coverY-8&&y<=g.coverY+g.coverH+8);if(cover>=0){desiredLane=cover;desiredHide=true;queuedThrow=false;return;}const wx=g.xs[game.witchLane??1];if(Math.abs(x-wx)<=g.witchW/2+10&&y>=g.witchBottom-g.witchH-10&&y<=g.witchBottom+10){desiredHide=false;queuedThrow=true;}});
 canvas.addEventListener('pointercancel',()=>pointer=null);
 document.addEventListener('visibilitychange',()=>{if(document.hidden&&active){last=0;acc=0;}});
