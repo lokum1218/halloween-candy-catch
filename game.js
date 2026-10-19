@@ -11,6 +11,7 @@ import {createGame,STEP,ENGINE_VERSION} from './engine.js';
   const timeEl = document.getElementById('time');
   const missesEl = document.getElementById('misses');
   const finalScoreEl = document.getElementById('final-score');
+  const coinAwardEl = document.getElementById('coin-award');
   const summaryEl = document.getElementById('end-summary');
   const againButton = document.getElementById('again-button');
   const keys = { left: false, right: false };
@@ -32,6 +33,7 @@ import {createGame,STEP,ENGINE_VERSION} from './engine.js';
   let score = 0, misses = 0, remaining = 60, elapsed = 0, spawnClock = 0;
   let basketX = W / 2, targetX = null;
   let drops = [], particles = [], floaters = [];
+  function showCoins(points) { coinAwardEl.textContent = `${Math.round(points * 0.1)}코인 적립하세요`; }
 
   function resize() {
     const rect=canvas.getBoundingClientRect();
@@ -80,6 +82,7 @@ import {createGame,STEP,ENGINE_VERSION} from './engine.js';
     try {
       const data=await api('/records',{sessionId:pending.sessionId,trace:pending.trace});
       finalScoreEl.textContent=data.record.score;
+      showCoins(data.record.score);
       saveStatus.textContent=`저장 완료 · 기록 번호 #${data.record.id}`;
       pending=null;try{sessionStorage.removeItem('candy-pending-record');}catch{}
       state='ended';againButton.disabled=false;
@@ -89,7 +92,7 @@ import {createGame,STEP,ENGINE_VERSION} from './engine.js';
     }
   }
   function finish() {
-    state='ended';endPanel.classList.remove('hidden');finalScoreEl.textContent=score;
+    state='ended';endPanel.classList.remove('hidden');finalScoreEl.textContent=score;showCoins(score);
     summaryEl.textContent=misses>=5?`${player}님, 사탕을 5개 놓쳤어요. 다음엔 더 빠르게!`:`${player}님, 60초를 버텼어요. 꽤 매서운 밤이었죠?`;
     pending={sessionId:session.sessionId,trace,nickname:player,score};
     try{sessionStorage.setItem('candy-pending-record',JSON.stringify(pending));}catch{}
@@ -200,7 +203,7 @@ import {createGame,STEP,ENGINE_VERSION} from './engine.js';
     const saved=JSON.parse(sessionStorage.getItem('candy-pending-record')||'null');
     if(saved&&typeof saved.sessionId==='string'&&Array.isArray(saved.trace)) {
       pending=saved;player=saved.nickname;startPanel.classList.add('hidden');endPanel.classList.remove('hidden');
-      finalScoreEl.textContent=saved.score;summaryEl.textContent='이전에 저장하지 못한 기록을 다시 전송합니다.';saveRecord();
+      finalScoreEl.textContent=saved.score;showCoins(saved.score);summaryEl.textContent='이전에 저장하지 못한 기록을 다시 전송합니다.';saveRecord();
     }
   }catch{}
 

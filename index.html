@@ -7,8 +7,8 @@
   <meta name="description" content="하늘에서 떨어지는 핼러윈 사탕을 호박 바구니에 받아 보세요.">
   <title>사탕 사냥 — 핼러윈 게임</title>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23170c29'/%3E%3Ctext x='32' y='47' text-anchor='middle' font-size='42'%3E%F0%9F%8E%83%3C/text%3E%3C/svg%3E">
-  <link rel="stylesheet" href="./style.css">
-  <script type="module" src="./game.js"></script>
+  <link rel="stylesheet" href="./style.css?v=2">
+  <script type="module" src="./game.js?v=2"></script>
 </head>
 <body>
   <main class="shell">
@@ -53,6 +53,7 @@
             <h2 id="end-title">사탕 수확 완료!</h2>
             <p id="end-summary"></p>
             <div class="final-score"><span>최종 점수</span><strong id="final-score">0</strong></div>
+            <p class="coin-award" id="coin-award" role="status">0코인 적립하세요</p>
             <p id="save-status" role="status"></p><button type="button" id="retry-save" class="again-button" hidden>기록 다시 저장</button><button type="button" id="again-button" class="again-button">다시 도전하기 <span aria-hidden="true">↗</span></button>
           </div>
         </div>
