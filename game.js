@@ -1,5 +1,7 @@
 import {createGame,STEP,ENGINE_VERSION} from './engine.js';
+import {createMusic} from './music.js?v=1';
 (() => {
+  const music = createMusic('candy', document.getElementById('music-toggle'));
   const canvas = document.getElementById('game');
   const ctx = canvas.getContext('2d');
   const startPanel = document.getElementById('start-panel');
@@ -60,7 +62,7 @@ import {createGame,STEP,ENGINE_VERSION} from './engine.js';
     if(state==='loading'||state==='saving'||pending)return;
     const clean=String(nickname).trim().slice(0,16);
     if(!clean)throw new Error('밴드 닉네임을 입력해 주세요.');
-    state='loading';startButton.disabled=true;againButton.disabled=true;
+    music.unlock();state='loading';startButton.disabled=true;againButton.disabled=true;
     startStatus.textContent='기록 서버에 연결 중…';
     try {
       resize();
@@ -69,7 +71,7 @@ import {createGame,STEP,ENGINE_VERSION} from './engine.js';
       W=session.width;H=session.height;engine=createGame(session.seed,W,H);trace=[];accumulator=0;
       player=session.nickname;playerEl.textContent=player;
       score=0;misses=0;remaining=60;elapsed=0;basketX=W/2;targetX=null;drops=[];particles=[];floaters=[];
-      state='playing';resize();startPanel.classList.add('hidden');endPanel.classList.add('hidden');
+      state='playing';music.start();resize();startPanel.classList.add('hidden');endPanel.classList.add('hidden');
       startStatus.textContent='';keys.left=keys.right=false;updateHud();
     } catch(error) {
       state='ready';endPanel.classList.add('hidden');startPanel.classList.remove('hidden');
@@ -92,7 +94,7 @@ import {createGame,STEP,ENGINE_VERSION} from './engine.js';
     }
   }
   function finish() {
-    state='ended';endPanel.classList.remove('hidden');finalScoreEl.textContent=score;showCoins(score);
+    state='ended';music.stop();endPanel.classList.remove('hidden');finalScoreEl.textContent=score;showCoins(score);
     summaryEl.textContent=misses>=5?`${player}님, 사탕을 5개 놓쳤어요. 다음엔 더 빠르게!`:`${player}님, 60초를 버텼어요. 꽤 매서운 밤이었죠?`;
     pending={sessionId:session.sessionId,trace,nickname:player,score};
     try{sessionStorage.setItem('candy-pending-record',JSON.stringify(pending));}catch{}
