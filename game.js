@@ -44,12 +44,24 @@ import {createMusic} from './music.js?v=1';
     canvas.width=Math.round(rect.width*ratio);canvas.height=Math.round(rect.height*ratio);
     ctx.setTransform(ratio*rect.width/W,0,0,ratio*rect.height/H,0,0);
   }
-  async function api(path,payload) {
-    const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),15000);
+  async function api(path,payload,timeout=15000) {
+    const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),timeout);
     try {
       const response=await fetch(API+path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload),signal:controller.signal});
       const data=await response.json();if(!response.ok)throw new Error(data.error||'기록 서버에 연결할 수 없습니다.');return data;
     } finally {clearTimeout(timer);}
+  }
+  async function startSession(nickname) {
+    for(let attempt=0;attempt<2;attempt++) {
+      try { return await api('/sessions',{nickname,width:W,height:H},10000); }
+      catch(error) {
+        if(attempt===0&&(error.name==='AbortError'||error.name==='TimeoutError'||error.message==='Failed to fetch')) {
+          startStatus.textContent='연결이 지연되어 다시 시도 중…';
+          continue;
+        }
+        throw error;
+      }
+    }
   }
   function basketWidth() { return Math.max(64, Math.min(88, W * .13)); }
   function clampX(x) { return Math.max(basketWidth() / 2 + 5, Math.min(W - basketWidth() / 2 - 5, x)); }
@@ -66,7 +78,7 @@ import {createMusic} from './music.js?v=1';
     startStatus.textContent='기록 서버에 연결 중…';
     try {
       resize();
-      session=await api('/sessions',{nickname:clean,width:W,height:H});
+      session=await startSession(clean);
       if(session.version!==ENGINE_VERSION)throw new Error('게임이 업데이트됐습니다. 새로고침해 주세요.');
       W=session.width;H=session.height;engine=createGame(session.seed,W,H);trace=[];accumulator=0;
       player=session.nickname;playerEl.textContent=player;
@@ -75,7 +87,8 @@ import {createMusic} from './music.js?v=1';
       startStatus.textContent='';keys.left=keys.right=false;updateHud();
     } catch(error) {
       state='ready';endPanel.classList.add('hidden');startPanel.classList.remove('hidden');
-      startStatus.textContent=error.message==='Failed to fetch'?'기록 서버에 연결하지 못했습니다. 다시 시도해 주세요.':error.message;
+      startStatus.textContent=error.name==='AbortError'||error.name==='TimeoutError'||error.message==='Failed to fetch'
+        ?'기록 서버가 응답하지 않아요. 잠시 후 다시 눌러 주세요.':error.message;
     } finally {startButton.disabled=false;againButton.disabled=false;}
   }
   async function saveRecord() {
