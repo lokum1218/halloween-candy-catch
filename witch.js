@@ -4,7 +4,8 @@ const music=createMusic('witch',document.getElementById('music-toggle'));
 const API='https://halloween-candy-catch.kcnwhydynd.chatgpt.site/api/witch';
 const $=id=>document.getElementById(id),canvas=$('scene'),ctx=canvas.getContext('2d');
 const witchSprite=new Image(),playerSprite=new Image(),biscuitSprite=new Image(),houseSprite=new Image();witchSprite.src='./witch-pixel-v3.png';playerSprite.src='./player-pixel-v3.png';biscuitSprite.src='./biscuit-pixel-v3.png';houseSprite.src='./candy-house-v3.png';
-let game=null,session=null,trace=[],desiredLane=1,desiredHide=false,queuedThrow=false,acc=0,last=0,active=false,pointer=null,pending=null,shots=[];
+let game=null,session=null,trace=[],desiredLane=1,desiredHide=false,queuedThrow=false,acc=0,last=0,active=false,pointer=null,pending=null,shots=[],saving=false;
+const PENDING_KEY='witch-pending-record';
 const seconds=t=>(t/TICK_RATE).toFixed(1)+'초';
 function sprite(img,cx,bottom,maxW,maxH){if(!img.complete||!img.naturalWidth)return;const scale=Math.min(maxW/img.naturalWidth,maxH/img.naturalHeight);ctx.imageSmoothingEnabled=false;ctx.drawImage(img,Math.round(cx-img.naturalWidth*scale/2),Math.round(bottom-img.naturalHeight*scale),Math.round(img.naturalWidth*scale),Math.round(img.naturalHeight*scale));}
 function resizeScene(){const mobile=window.matchMedia('(max-width:700px)').matches;const w=mobile?480:960,h=mobile?740:590;if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h;}return {w,h,mobile};}
@@ -38,14 +39,67 @@ function draw(){
  }
  drawShots(performance.now(),g,mobile);
 }
-async function api(path,data){const r=await fetch(API+path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});const d=await r.json();if(!r.ok)throw Error(d.error||'기록 서버에 연결할 수 없습니다.');return d;}
+async function api(path,data,timeout=12000){
+ const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),timeout);
+ try{const r=await fetch(API+path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data),signal:controller.signal});
+  const d=await r.json();if(!r.ok){const error=new Error(d.error||'기록 서버에 연결할 수 없습니다.');error.status=r.status;throw error;}return d;
+ }finally{clearTimeout(timer);}
+}
+const transient=e=>e.name==='AbortError'||e.name==='TimeoutError'||e.message==='Failed to fetch'||[409,429,503,504].includes(e.status);
+async function startSession(nickname){
+ for(let attempt=0;attempt<2;attempt++)try{return await api('/sessions',{nickname});}catch(e){
+  if(attempt===0&&transient(e)){$('start-status').textContent='연결이 지연되어 다시 시도 중…';continue;}throw e;
+ }
+}
 function hud(){if(!game)return;$('time').textContent=seconds(game.tick);$('throws').textContent=game.throws+'개';}
-async function save(){if(!pending)return;$('save-status').textContent='기록 저장 중…';$('retry').hidden=true;try{const d=await api('/records',pending);pending=null;$('save-status').textContent='저장 완료 · 기록 번호 '+d.record.id;$('again').disabled=false;}catch(e){$('save-status').textContent='저장 실패: '+e.message;$('retry').hidden=false;}}
-function finish(){active=false;music.stop();$('end-title').textContent=game.reason==='끝까지 버팀'?'마녀를 끝까지 따돌렸어요!':game.reason==='과자를 던지지 않음'?'과자를 던져야 해요!':'마녀에게 들켰어요!';$('end-detail').textContent='던진 과자 '+game.throws+'개 · '+(game.reason==='끝까지 버팀'?'90초 생존 성공':'다음에는 마녀의 시선을 보고 숨으세요.');$('final-time').textContent=seconds(game.tick);$('coin-award').textContent=Math.round(game.tick/TICK_RATE*0.1)+'코인 적립하세요';$('end').classList.toggle('caught',game.reason==='들킴');$('end').classList.remove('hidden');$('again').disabled=true;
- pending={sessionId:session.sessionId,trace:[...trace]};save();}
-function frame(now){if(active){if(!last)last=now;acc+=Math.min(100,now-last);last=now;while(acc>=1000/TICK_RATE&&active){const command=desiredLane|(desiredHide?4:0)|(queuedThrow?8:0);queuedThrow=false;try{game.step(command);trace.push(command);if(command&8){const g=geometry(canvas.width===480),lane=game.witchLane;shots.push({at:now,fromX:g.xs[game.lane],fromY:g.coverY-35,toX:g.xs[lane],toY:g.witchBottom-g.witchH*.46,lane});}}catch(e){desiredLane=game.lane;desiredHide=false;queuedThrow=false;game.step(game.lane);trace.push(game.lane);}desiredHide=game.hidden;acc-=1000/TICK_RATE;if(game.ended)finish();}hud();}draw();requestAnimationFrame(frame);}requestAnimationFrame(frame);
-$('start-form').onsubmit=async e=>{e.preventDefault();music.unlock();const b=e.currentTarget.querySelector('button');b.disabled=true;$('start-status').textContent='게임 준비 중…';try{session=await api('/sessions',{nickname:$('nickname').value});game=createWitchGame(session.seed);trace=[];shots=[];desiredLane=1;desiredHide=false;queuedThrow=false;acc=0;last=0;active=true;music.start();$('start').classList.add('hidden');if(window.matchMedia('(max-width:700px)').matches)$('scene').scrollIntoView({block:'center'});$('start-status').textContent='';}catch(err){$('start-status').textContent=err.message;}finally{b.disabled=false;}};
-$('retry').onclick=save;$('again').onclick=()=>{$('end').classList.add('hidden');$('start').classList.remove('hidden');$('save-status').textContent='';};
+function showResult(result){
+ $('end-title').textContent=result.reason==='끝까지 버팀'?'마녀를 끝까지 따돌렸어요!':result.reason==='과자를 던지지 않음'?'과자를 던져야 해요!':'마녀에게 들켰어요!';
+ $('end-detail').textContent='던진 과자 '+result.throws+'개 · '+(result.reason==='끝까지 버팀'?'90초 생존 성공':'다음에는 마녀의 시선을 보고 숨으세요.');
+ $('final-time').textContent=seconds(result.ticks);
+ $('coin-award').textContent=Math.round(result.throws*0.1)+'코인 적립하세요';
+ $('end').classList.toggle('caught',result.reason==='들킴');$('end').classList.remove('hidden');
+ $('again').disabled=true;
+}
+async function save(){
+ if(!pending||saving)return;
+ saving=true;$('retry').hidden=true;$('again').disabled=true;
+ for(let attempt=0;attempt<3;attempt++){
+  $('save-status').textContent=attempt?'연결을 다시 확인하며 기록 저장 중…':'기록 저장 중…';
+  try{
+   const d=await api('/records',pending);
+   if(!d.record||!Number.isInteger(d.record.id))throw Error('저장 결과를 확인하지 못했습니다.');
+   if(Number.isInteger(d.record.throws))$('coin-award').textContent=Math.round(d.record.throws*0.1)+'코인 적립하세요';
+   pending=null;try{sessionStorage.removeItem(PENDING_KEY);}catch{}
+   $('save-status').textContent='저장 완료 · 기록 번호 '+d.record.id;$('again').disabled=false;saving=false;return;
+  }catch(e){
+   if(attempt<2&&transient(e)){await new Promise(resolve=>setTimeout(resolve,e.status===409?1800:500*(attempt+1)));continue;}
+   $('save-status').textContent=transient(e)?'연결이 불안정해요. 기록은 이 화면에 보관 중이니 다시 저장해 주세요.':'저장 실패: '+e.message;
+   $('retry').hidden=false;saving=false;return;
+  }
+ }
+}
+function finish(){
+ active=false;music.stop();
+ pending={sessionId:session.sessionId,trace:[...trace],nickname:session.nickname,ticks:game.tick,throws:game.throws,reason:game.reason};
+ try{sessionStorage.setItem(PENDING_KEY,JSON.stringify(pending));}catch{}
+ showResult(pending);save();
+}
+function frame(now){if(active){if(!last)last=now;acc+=Math.min(100,now-last);last=now;while(acc>=1000/TICK_RATE&&active){
+ // The engine mutates cooldowns before rejecting an invalid throw. Only submit valid commands,
+ // so the visible run and its server replay always advance through the same trace.
+ if(desiredLane!==game.lane&&game.moveCooldown)desiredLane=game.lane;
+ const throwNow=queuedThrow&&game.throwCooldown<=1&&!desiredHide;
+ queuedThrow=false;
+ const command=desiredLane|(desiredHide?4:0)|(throwNow?8:0);
+ game.step(command);trace.push(command);
+ if(throwNow){const g=geometry(canvas.width===480),lane=game.witchLane;shots.push({at:now,fromX:g.xs[game.lane],fromY:g.coverY-35,toX:g.xs[lane],toY:g.witchBottom-g.witchH*.46,lane});}
+ desiredLane=game.lane;desiredHide=game.hidden;acc-=1000/TICK_RATE;if(game.ended)finish();
+ }hud();}draw();requestAnimationFrame(frame);}requestAnimationFrame(frame);
+$('start-form').onsubmit=async e=>{e.preventDefault();if(pending)return;music.unlock();const b=e.currentTarget.querySelector('button');b.disabled=true;$('start-status').textContent='게임 준비 중…';try{session=await startSession($('nickname').value);game=createWitchGame(session.seed);trace=[];shots=[];desiredLane=1;desiredHide=false;queuedThrow=false;acc=0;last=0;active=true;music.start();$('start').classList.add('hidden');if(window.matchMedia('(max-width:700px)').matches)$('scene').scrollIntoView({block:'center'});$('start-status').textContent='';}catch(err){$('start-status').textContent=err.message;}finally{b.disabled=false;}};
+$('retry').onclick=save;$('again').onclick=()=>{if(pending)return;$('end').classList.add('hidden');$('start').classList.remove('hidden');$('save-status').textContent='';};
+try{const saved=JSON.parse(sessionStorage.getItem(PENDING_KEY)||'null');if(saved&&typeof saved.sessionId==='string'&&Array.isArray(saved.trace)&&Number.isInteger(saved.ticks)&&Number.isInteger(saved.throws)){
+ pending=saved;$('start').classList.add('hidden');showResult(saved);save();
+}}catch{}
 canvas.addEventListener('pointerdown',e=>{if(!active)return;pointer={x:e.clientX,y:e.clientY,id:e.pointerId};canvas.setPointerCapture(e.pointerId);});
 canvas.addEventListener('pointerup',e=>{if(!active||!pointer||pointer.id!==e.pointerId)return;const dx=e.clientX-pointer.x,dy=e.clientY-pointer.y;pointer=null;if(Math.hypot(dx,dy)>30)return;const rect=canvas.getBoundingClientRect(),x=(e.clientX-rect.left)*canvas.width/rect.width,y=(e.clientY-rect.top)*canvas.height/rect.height,g=geometry(canvas.width===480);const cover=g.xs.findIndex(cx=>Math.abs(x-cx)<=g.coverW/2+5&&y>=g.coverY-8&&y<=g.coverY+g.coverH+8);if(cover>=0){desiredLane=cover;desiredHide=true;queuedThrow=false;return;}const wx=g.xs[game.witchLane??1];if(Math.abs(x-wx)<=g.witchW/2+10&&y>=g.witchBottom-g.witchH-10&&y<=g.witchBottom+10){desiredHide=false;queuedThrow=true;}});
 canvas.addEventListener('pointercancel',()=>pointer=null);
