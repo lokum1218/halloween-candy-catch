@@ -56,7 +56,7 @@ function showResult(result){
  $('end-title').textContent=result.reason==='끝까지 버팀'?'마녀를 끝까지 따돌렸어요!':result.reason==='과자를 던지지 않음'?'과자를 던져야 해요!':'마녀에게 들켰어요!';
  $('end-detail').textContent='던진 과자 '+result.throws+'개 · '+(result.reason==='끝까지 버팀'?'90초 생존 성공':'다음에는 마녀의 시선을 보고 숨으세요.');
  $('final-time').textContent=seconds(result.ticks);
- $('coin-award').textContent=Math.round(result.throws*0.1)+'코인 적립하세요';
+ $('coin-award').textContent=result.throws+'코인 적립하세요';
  $('end').classList.toggle('caught',result.reason==='들킴');$('end').classList.remove('hidden');
  $('again').disabled=true;
 }
@@ -68,7 +68,7 @@ async function save(){
   try{
    const d=await api('/records',pending);
    if(!d.record||!Number.isInteger(d.record.id))throw Error('저장 결과를 확인하지 못했습니다.');
-   if(Number.isInteger(d.record.throws))$('coin-award').textContent=Math.round(d.record.throws*0.1)+'코인 적립하세요';
+   if(Number.isInteger(d.record.throws))$('coin-award').textContent=d.record.throws+'코인 적립하세요';
    pending=null;try{sessionStorage.removeItem(PENDING_KEY);}catch{}
    $('save-status').textContent='저장 완료 · 기록 번호 '+d.record.id;$('again').disabled=false;saving=false;return;
   }catch(e){
